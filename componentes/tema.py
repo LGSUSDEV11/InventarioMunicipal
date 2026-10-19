@@ -1,0 +1,31 @@
+COLORES = {
+    "azul_oscuro": "#1a2b4a",
+    "azul_hover": "#243a63",
+    "azul_activo": "#2563eb",
+    "azul_claro": "#dbeafe",
+    "azul_boton": "#1e40af",
+    "azul_boton_hover": "#1d4ed8",
+    "fondo": "#f5f7fa",
+    "blanco": "#ffffff",
+    "texto": "#1f2937",
+    "texto_claro": "#6b7280",
+    "texto_sidebar": "#cbd5e1",
+    "borde": "#e5e7eb",
+    "verde": "#10b981",
+    "verde_claro": "#d1fae5",
+    "amarillo": "#f59e0b",
+    "amarillo_claro": "#fef3c7",
+    "rojo": "#ef4444",
+    "rojo_claro": "#fee2e2",
+    "morado": "#8b5cf6",
+    "morado_claro": "#ede9fe",
+}
+
+FUENTES = {
+    "titulo": ("Segoe UI", 22, "bold"),
+    "subtitulo": ("Segoe UI", 14, "bold"),
+    "texto": ("Segoe UI", 12),
+    "texto_peq": ("Segoe UI", 10),
+    "boton": ("Segoe UI", 12, "bold"),
+    "stat": ("Segoe UI", 26, "bold"),
+}
