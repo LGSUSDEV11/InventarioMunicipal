@@ -4,11 +4,13 @@ from componentes.sidebar import Sidebar
 from componentes.topbar import Topbar
 from vistas.inicio import VistaInicio
 
+
 class VentanaPrincipal(ctk.CTk):
 
-    def __init__(self, cnn, usuario):
+    def __init__(self, cnn_pg, cnn_sql, usuario):
         super().__init__()
-        self.cnn = cnn
+        self.cnn_pg = cnn_pg    # Conexión a PostgreSQL (Clever Cloud)
+        self.cnn_sql = cnn_sql  # Conexión a SQL Server (Local)
         self.usuario = usuario
 
         self.title("Sistema de Inventario de Bienes Patrimoniales — Sahuayo")
@@ -39,17 +41,19 @@ class VentanaPrincipal(ctk.CTk):
         from vistas.reportes import VistaReportes
         from vistas.usuarios import VistaUsuarios
         from vistas.configuracion import VistaConfiguracion
-        
 
         self.vistas = {
-            "inicio": lambda: VistaInicio(self.area, self.cnn),
-            "consulta": lambda: VistaConsultaBienes(self.area, self.cnn),
-            "alta": lambda: VistaAltaBienes(self.area, self.cnn),
-            "movimientos": lambda: VistaMovimientos(self.area, self.cnn),
-            "conciliacion": lambda: VistaConciliacion(self.area, self.cnn),
-            "reportes": lambda: VistaReportes(self.area, self.cnn),
-            "usuarios": lambda: VistaUsuarios(self.area, self.cnn),
-            "configuracion": lambda: VistaConfiguracion(self.area, self.cnn),
+            "inicio": lambda: VistaInicio(self.area, self.cnn_pg),
+            "consulta": lambda: VistaConsultaBienes(self.area, self.cnn_pg),
+            "alta": lambda: VistaAltaBienes(self.area, self.cnn_pg),
+            "movimientos": lambda: VistaMovimientos(self.area, self.cnn_pg),
+            "conciliacion": lambda: VistaConciliacion(self.area, self.cnn_pg),
+            "reportes": lambda: VistaReportes(self.area, self.cnn_pg),
+            
+            # ¡AQUÍ ESTÁ LA MAGIA! Usuarios usará SQL Server
+            "usuarios": lambda: VistaUsuarios(self.area, self.cnn_sql), 
+            
+            "configuracion": lambda: VistaConfiguracion(self.area, self.cnn_pg),
         }
 
         pie = ctk.CTkLabel(
