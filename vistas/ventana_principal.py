@@ -20,6 +20,16 @@ class VentanaPrincipal(ctk.CTk):
 
         self._construir()
         self.mostrar("inicio")
+        
+        self.protocol("WM_DELETE_WINDOW", self._al_cerrar)
+        
+    def _al_cerrar(self):
+        if self.cnn_pg:
+            self.cnn_pg.cerrar_conexion()
+        if self.cnn_sql and self.cnn_sql.CNX:
+            self.cnn_sql.cerrar_conexion()
+        self.destroy()
+
 
     def _construir(self):
         self.sidebar = Sidebar(self, al_seleccionar=self.mostrar)
@@ -50,7 +60,7 @@ class VentanaPrincipal(ctk.CTk):
             "conciliacion": lambda: VistaConciliacion(self.area, self.cnn_pg),
             "reportes": lambda: VistaReportes(self.area, self.cnn_pg),
             
-            # ¡AQUÍ ESTÁ LA MAGIA! Usuarios usará SQL Server
+           
             "usuarios": lambda: VistaUsuarios(self.area, self.cnn_sql), 
             
             "configuracion": lambda: VistaConfiguracion(self.area, self.cnn_pg),
