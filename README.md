@@ -8,7 +8,7 @@ Aplicación de escritorio desarrollada en Python para el control y conciliación
 ## Tecnologías Utilizadas
 - **Lenguaje:** Python 3.12
 - **Interfaz Gráfica:** CustomTkinter
-- **Base de Datos:** PostgreSQL
+- **Base de Datos:** PostgreSQL y SQLServer
 - **Librerías principales:** `psycopg2` (conexión BD), `reportlab` (PDF), `openpyxl` (Excel), `python-dotenv` (variables de entorno).
 
 *Nota sobre la interfaz:* Se eligió **CustomTkinter** en lugar de PyQt6 porque permitió replicar de manera más ágil y ligera el diseño institucional moderno (colores, tarjetas redondeadas, menú lateral) solicitado en las interfaces de referencia.
