@@ -4,6 +4,8 @@ from tkinter import messagebox
 import customtkinter as ctk
 from componentes.tema import COLORES, FUENTES
 from componentes.tabla import Tabla
+from repositorios.repo_movimientos import RepoMovimientos
+from repositorios.repo_catalogos import RepoCatalogos
 
 
 class VistaMovimientos(ctk.CTkFrame):
@@ -19,28 +21,11 @@ class VistaMovimientos(ctk.CTkFrame):
         self._construir()
         self._buscar()
 
-    # ------------------------------------------------------------------
-    # Catálogos
-    # ------------------------------------------------------------------
     def _cargar_catalogos(self):
-        self.catalogos["bienes"] = self._traer(
-            "SELECT id_bien AS id, codigo_inventario || ' - ' || nombre AS nombre "
-            "FROM bienes ORDER BY codigo_inventario"
-        )
-        self.catalogos["responsables"] = self._traer(
-            "SELECT id_responsable AS id, nombre FROM responsables WHERE estado = 'Activo' ORDER BY nombre"
-        )
-        self.catalogos["ubicaciones"] = self._traer(
-            "SELECT u.id_ubicacion AS id, "
-            "       e.nombre || ' - ' || a.nombre AS nombre "
-            "FROM ubicaciones u "
-            "JOIN edificios e ON e.id_edificio = u.id_edificio "
-            "JOIN areas a ON a.id_area = u.id_area "
-            "ORDER BY e.nombre"
-        )
-        self.catalogos["usuarios"] = self._traer(
-            "SELECT id_usuario AS id, usuario FROM usuarios ORDER BY usuario"
-        )
+        self.catalogos["bienes"] = self._traer(RepoCatalogos.PG_BIENES)
+        self.catalogos["responsables"] = self._traer(RepoCatalogos.PG_RESPONSABLES)
+        self.catalogos["ubicaciones"] = self._traer(RepoCatalogos.PG_UBICACIONES)
+        self.catalogos["usuarios"] = self._traer(RepoCatalogos.PG_USUARIOS)
 
     def _traer(self, sql):
         resp = json.loads(self.cnn.ejecutar_consulta(sql))
@@ -48,9 +33,6 @@ class VistaMovimientos(ctk.CTkFrame):
             return []
         return resp["registros"]
 
-    # ------------------------------------------------------------------
-    # Construcción de UI
-    # ------------------------------------------------------------------
     def _construir(self):
         ctk.CTkLabel(self, text="🔄  Movimientos", font=FUENTES["titulo"],
                      text_color=COLORES["texto"]).pack(anchor="w", padx=30, pady=(25, 0))
@@ -187,19 +169,8 @@ class VistaMovimientos(ctk.CTkFrame):
                        fg_color=COLORES["azul_boton"], hover_color=COLORES["azul_boton_hover"],
                        command=self._registrar).pack(fill="x", padx=20, pady=(0, 20))
 
-    # ------------------------------------------------------------------
-    # Búsqueda y render
-    # ------------------------------------------------------------------
     def _buscar(self):
-        sql = """
-            SELECT m.id_movimiento, m.tipo_movimiento, m.fecha_movimiento, m.descripcion,
-                   b.codigo_inventario, b.nombre AS bien, b.id_bien,
-                   u.usuario, b.estado
-            FROM movimientos m
-            JOIN bienes b ON b.id_bien = m.id_bien
-            JOIN usuarios u ON u.id_usuario = m.id_usuario
-            WHERE 1=1
-        """
+        sql = RepoMovimientos.PG_BUSCAR + " AND 1=1"
         parametros = []
 
         texto = self.entry_bien.get().strip()
@@ -282,9 +253,6 @@ class VistaMovimientos(ctk.CTkFrame):
         self.combo_fecha.set("Todas")
         self._buscar()
 
-    # ------------------------------------------------------------------
-    # Registro de movimiento
-    # ------------------------------------------------------------------
     def _registrar(self):
         if self.combo_bien.get() == "— Seleccione —":
             messagebox.showwarning("Faltan datos", "Seleccione el bien.")
@@ -304,8 +272,7 @@ class VistaMovimientos(ctk.CTkFrame):
         observaciones = self.txt_observaciones.get("1.0", "end").strip()
 
         resp = json.loads(self.cnn.ejecutar_consulta(
-            "INSERT INTO movimientos (id_bien, id_usuario, tipo_movimiento, fecha_movimiento, descripcion) "
-            "VALUES (%s, %s, %s, %s, %s)",
+            RepoMovimientos.PG_INSERTAR,
             (id_bien, 1, tipo, fecha, observaciones or None)
         ))
         if not resp.get("estado"):
@@ -317,7 +284,7 @@ class VistaMovimientos(ctk.CTkFrame):
                             if r["nombre"] == self.combo_responsable.get()), None)
             if id_resp:
                 self.cnn.ejecutar_consulta(
-                    "UPDATE bienes SET id_responsable = %s WHERE id_bien = %s",
+                    RepoMovimientos.PG_ACTUALIZAR_RESPONSABLE,
                     (id_resp, id_bien)
                 )
 
@@ -326,18 +293,18 @@ class VistaMovimientos(ctk.CTkFrame):
                             if u["nombre"] == self.combo_ubicacion.get()), None)
             if id_ubic:
                 self.cnn.ejecutar_consulta(
-                    "UPDATE bienes SET id_ubicacion = %s WHERE id_bien = %s",
+                    RepoMovimientos.PG_ACTUALIZAR_UBICACION,
                     (id_ubic, id_bien)
                 )
 
         if tipo == "Baja":
             self.cnn.ejecutar_consulta(
-                "UPDATE bienes SET estado = 'Baja' WHERE id_bien = %s", (id_bien,)
+                RepoMovimientos.PG_ACTUALIZAR_ESTADO, ('Baja', id_bien)
             )
 
         if tipo == "Mantenimiento":
             self.cnn.ejecutar_consulta(
-                "UPDATE bienes SET estado = 'Inactivo' WHERE id_bien = %s", (id_bien,)
+                RepoMovimientos.PG_ACTUALIZAR_ESTADO, ('Inactivo', id_bien)
             )
 
         messagebox.showinfo("Registrado", "Movimiento registrado correctamente.")

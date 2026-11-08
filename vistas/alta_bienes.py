@@ -3,6 +3,8 @@ from datetime import date
 from tkinter import messagebox
 import customtkinter as ctk
 from componentes.tema import COLORES, FUENTES
+from repositorios.repo_bienes import RepoBienes
+from repositorios.repo_catalogos import RepoCatalogos
 
 
 class VistaAltaBienes(ctk.CTkFrame):
@@ -19,27 +21,11 @@ class VistaAltaBienes(ctk.CTkFrame):
         if bien_editar:
             self._precargar(bien_editar)
 
-    # ------------------------------------------------------------------
-    # Carga de catálogos
-    # ------------------------------------------------------------------
     def _cargar_catalogos(self):
-        self.catalogos["tipos"] = self._traer(
-            "SELECT id_tipo AS id, nombre FROM tipos_bien ORDER BY nombre"
-        )
-        self.catalogos["responsables"] = self._traer(
-            "SELECT id_responsable AS id, nombre FROM responsables WHERE estado = 'Activo' ORDER BY nombre"
-        )
-        self.catalogos["areas"] = self._traer(
-            "SELECT id_area AS id, nombre FROM areas WHERE estado = 'Activo' ORDER BY nombre"
-        )
-        self.catalogos["ubicaciones"] = self._traer(
-            "SELECT u.id_ubicacion AS id, "
-            "       e.nombre || ' - ' || a.nombre || COALESCE(' (' || u.descripcion || ')', '') AS nombre "
-            "FROM ubicaciones u "
-            "JOIN edificios e ON e.id_edificio = u.id_edificio "
-            "JOIN areas a ON a.id_area = u.id_area "
-            "ORDER BY e.nombre"
-        )
+        self.catalogos["tipos"] = self._traer(RepoCatalogos.PG_TIPOS)
+        self.catalogos["responsables"] = self._traer(RepoCatalogos.PG_RESPONSABLES)
+        self.catalogos["areas"] = self._traer(RepoCatalogos.PG_AREAS)
+        self.catalogos["ubicaciones"] = self._traer(RepoCatalogos.PG_UBICACIONES)
 
     def _traer(self, sql):
         resp = json.loads(self.cnn.ejecutar_consulta(sql))
@@ -47,9 +33,6 @@ class VistaAltaBienes(ctk.CTkFrame):
             return []
         return resp["registros"]
 
-    # ------------------------------------------------------------------
-    # Construcción de la interfaz
-    # ------------------------------------------------------------------
     def _construir(self):
         ctk.CTkLabel(self, text="➕  Alta de bienes",
                      font=FUENTES["titulo"], text_color=COLORES["texto"]).pack(
@@ -212,9 +195,6 @@ class VistaAltaBienes(ctk.CTkFrame):
             command=self._limpiar
         ).pack(fill="x")
 
-    # ------------------------------------------------------------------
-    # Lógica de guardado
-    # ------------------------------------------------------------------
     def _id_por_nombre(self, lista, nombre):
         return next((x["id"] for x in lista if x["nombre"] == nombre), None)
 
@@ -275,16 +255,10 @@ class VistaAltaBienes(ctk.CTkFrame):
                 messagebox.showerror("Error", resp.get("error", "No se pudo actualizar."))
             return
 
-        sql = """
-            INSERT INTO bienes
-                (codigo_inventario, nombre, descripcion, fecha_adquisicion,
-                 valor_adquisicion, estado, id_tipo, id_ubicacion, id_responsable)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id_bien
-        """
+        # Usamos el repositorio para el INSERT
         parametros = (codigo, nombre, descripcion or None, fecha, valor, estado,
                       id_tipo, id_ubic, id_resp)
-        resp = json.loads(self.cnn.ejecutar_consulta(sql, parametros))
+        resp = json.loads(self.cnn.ejecutar_consulta(RepoBienes.PG_INSERTAR, parametros))
 
         if not resp.get("estado"):
             error = resp.get("error", "")

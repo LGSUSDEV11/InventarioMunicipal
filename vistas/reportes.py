@@ -7,6 +7,8 @@ from tkinter import messagebox
 import customtkinter as ctk
 from componentes.tema import COLORES, FUENTES
 from reportes.generador import GeneradorReportes
+from repositorios.repo_dashboard import RepoDashboard
+from repositorios.repo_catalogos import RepoCatalogos
 
 
 class VistaReportes(ctk.CTkFrame):
@@ -30,14 +32,10 @@ class VistaReportes(ctk.CTkFrame):
         self._cargar_recientes()
 
     def _cargar_catalogos(self):
-        resp = json.loads(self.cnn.ejecutar_consulta(
-            "SELECT id_area AS id, nombre FROM areas WHERE estado = 'Activo' ORDER BY nombre"
-        ))
+        resp = json.loads(self.cnn.ejecutar_consulta(RepoCatalogos.PG_AREAS))
         self.catalogos["areas"] = resp.get("registros", []) if resp.get("estado") else []
 
-        resp = json.loads(self.cnn.ejecutar_consulta(
-            "SELECT id_responsable AS id, nombre FROM responsables WHERE estado = 'Activo' ORDER BY nombre"
-        ))
+        resp = json.loads(self.cnn.ejecutar_consulta(RepoCatalogos.PG_RESPONSABLES))
         self.catalogos["responsables"] = resp.get("registros", []) if resp.get("estado") else []
 
     def _construir(self):
@@ -142,7 +140,6 @@ class VistaReportes(ctk.CTkFrame):
                        fg_color=COLORES["azul_boton"], hover_color=COLORES["azul_boton_hover"],
                        command=self._generar).pack(side="right")
 
-        # Panel derecho — Reportes recientes
         derecha = ctk.CTkFrame(contenedor, fg_color=COLORES["blanco"], corner_radius=12,
                                 border_width=1, border_color=COLORES["borde"], width=340)
         derecha.pack(side="right", fill="y", padx=(20, 0))
@@ -168,16 +165,7 @@ class VistaReportes(ctk.CTkFrame):
 
     def _obtener_datos(self):
         f = self._filtros()
-        sql = """
-            SELECT b.codigo_inventario, b.nombre, b.fecha_adquisicion, b.valor_adquisicion,
-                   b.estado, t.nombre AS tipo, a.nombre AS area, r.nombre AS responsable
-            FROM bienes b
-            JOIN tipos_bien t ON t.id_tipo = b.id_tipo
-            JOIN ubicaciones u ON u.id_ubicacion = b.id_ubicacion
-            JOIN areas a ON a.id_area = u.id_area
-            JOIN responsables r ON r.id_responsable = b.id_responsable
-            WHERE b.fecha_adquisicion BETWEEN %s AND %s
-        """
+        sql = RepoDashboard.PG_REPORTES + " "
         parametros = [f["fecha_ini"], f["fecha_fin"]]
 
         if f["area"]:

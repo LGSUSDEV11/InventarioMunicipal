@@ -53,16 +53,13 @@ class VentanaPrincipal(ctk.CTk):
         from vistas.configuracion import VistaConfiguracion
 
         self.vistas = {
-            "inicio": lambda: VistaInicio(self.area, self.cnn_pg),
+            "inicio": lambda: VistaInicio(self.area, self.cnn_sql),     
             "consulta": lambda: VistaConsultaBienes(self.area, self.cnn_pg),
             "alta": lambda: VistaAltaBienes(self.area, self.cnn_pg),
             "movimientos": lambda: VistaMovimientos(self.area, self.cnn_pg),
             "conciliacion": lambda: VistaConciliacion(self.area, self.cnn_pg),
             "reportes": lambda: VistaReportes(self.area, self.cnn_pg),
-            
-           
-            "usuarios": lambda: VistaUsuarios(self.area, self.cnn_sql), 
-            
+            "usuarios": lambda: VistaUsuarios(self.area, self.cnn_pg),  
             "configuracion": lambda: VistaConfiguracion(self.area, self.cnn_pg),
         }
 

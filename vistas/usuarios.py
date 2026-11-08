@@ -4,7 +4,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 from componentes.tema import COLORES, FUENTES
 from componentes.tabla import Tabla
-
+from repositorios.repo_usuarios import RepoUsuarios # <-- IMPORTAMOS EL REPO
 
 class VistaUsuarios(ctk.CTkFrame):
 
@@ -19,9 +19,9 @@ class VistaUsuarios(ctk.CTkFrame):
         "Consulta": (COLORES["verde_claro"], COLORES["verde"]),
     }
 
-    def __init__(self, master, cnn_sql):
+    def __init__(self, master, cnn_pg): # <-- Ahora recibe cnn_pg
         super().__init__(master, fg_color=COLORES["fondo"], corner_radius=0)
-        self.cnn = cnn_sql 
+        self.cnn = cnn_pg 
         self.usuarios_actuales = []
         self.usuario_editando = None
 
@@ -29,9 +29,9 @@ class VistaUsuarios(ctk.CTkFrame):
         self._buscar()
 
     def _construir(self):
-        ctk.CTkLabel(self, text="👥  Usuarios (SQL Server)", font=FUENTES["titulo"],
+        ctk.CTkLabel(self, text="👥  Usuarios (PostgreSQL)", font=FUENTES["titulo"],
                      text_color=COLORES["texto"]).pack(anchor="w", padx=30, pady=(25, 0))
-        ctk.CTkLabel(self, text="Administración de cuentas de usuario (Conectado a SQL Server).",
+        ctk.CTkLabel(self, text="Administración de cuentas de usuario (Conectado a PostgreSQL).",
                      font=FUENTES["texto"], text_color=COLORES["texto_claro"]).pack(
             anchor="w", padx=30, pady=(0, 15))
 
@@ -74,9 +74,9 @@ class VistaUsuarios(ctk.CTkFrame):
                        hover_color=COLORES["azul_boton_hover"],
                        command=self._buscar).pack(side="left")
         ctk.CTkButton(botones, text="Limpiar", width=110, height=36, font=FUENTES["texto"],
-                    corner_radius=8, fg_color=COLORES["borde"], hover_color="#d1d5db",
-                    text_color=COLORES["texto"],
-                    command=self._limpiar).pack(side="left", padx=10)
+                       corner_radius=8, fg_color=COLORES["borde"], hover_color="#d1d5db",
+                       text_color=COLORES["texto"],
+                       command=self._limpiar).pack(side="left", padx=10)
 
         cuerpo = ctk.CTkFrame(self, fg_color="transparent")
         cuerpo.pack(fill="both", expand=True, padx=30, pady=(0, 20))
@@ -85,8 +85,8 @@ class VistaUsuarios(ctk.CTkFrame):
         izquierda.pack(side="left", fill="both", expand=True)
 
         self.lbl_contador = ctk.CTkLabel(izquierda, text="Mostrando 0 usuarios",
-                        font=FUENTES["texto_peq"],
-                        text_color=COLORES["texto_claro"])
+                                           font=FUENTES["texto_peq"],
+                                           text_color=COLORES["texto_claro"])
         self.lbl_contador.pack(anchor="w", pady=(0, 5))
 
         self.contenedor_tabla = ctk.CTkFrame(izquierda, fg_color="transparent")
@@ -187,20 +187,20 @@ class VistaUsuarios(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _buscar(self):
-        sql = "SELECT id_usuario, usuario, rol, estado FROM usuarios WHERE 1=1"
+        sql = RepoUsuarios.PG_BUSCAR + " AND 1=1"
         parametros = []
 
         texto = self.entry_busqueda.get().strip()
         if texto:
-            sql += " AND usuario LIKE ?"
+            sql += " AND usuario ILIKE %s" # PostgreSQL usa ILIKE
             parametros.append(f"%{texto}%")
 
         if self.combo_rol.get() != "Todos":
-            sql += " AND rol = ?"
+            sql += " AND rol = %s"
             parametros.append(self.combo_rol.get())
 
         if self.combo_estado.get() != "Todos":
-            sql += " AND estado = ?"
+            sql += " AND estado = %s"
             parametros.append(self.combo_estado.get())
 
         sql += " ORDER BY id_usuario"
@@ -215,12 +215,7 @@ class VistaUsuarios(ctk.CTkFrame):
         self._actualizar_tarjetas()
 
     def _actualizar_tarjetas(self):
-        resp = json.loads(self.cnn.ejecutar_consulta(
-            "SELECT COUNT(*) AS total, "
-            "SUM(CASE WHEN estado='Activo' THEN 1 ELSE 0 END) AS activos, "
-            "SUM(CASE WHEN estado='Inactivo' THEN 1 ELSE 0 END) AS inactivos "
-            "FROM usuarios"
-        ))
+        resp = json.loads(self.cnn.ejecutar_consulta(RepoUsuarios.PG_STATS))
         if resp.get("estado") and resp["registros"]:
             r = resp["registros"][0]
             self.tarjetas["total"].valor_widget.configure(text=str(r["total"]))
@@ -328,12 +323,12 @@ class VistaUsuarios(ctk.CTkFrame):
         if self.usuario_editando:
             if password:
                 resp = json.loads(self.cnn.ejecutar_consulta(
-                    "UPDATE usuarios SET password = ?, rol = ?, estado = ? WHERE id_usuario = ?",
+                    RepoUsuarios.PG_ACTUALIZAR_CON_PASS,
                     (password, rol, estado, self.usuario_editando["id_usuario"])
                 ))
             else:
                 resp = json.loads(self.cnn.ejecutar_consulta(
-                    "UPDATE usuarios SET rol = ?, estado = ? WHERE id_usuario = ?",
+                    RepoUsuarios.PG_ACTUALIZAR_SIN_PASS,
                     (rol, estado, self.usuario_editando["id_usuario"])
                 ))
             if resp.get("estado"):
@@ -348,7 +343,7 @@ class VistaUsuarios(ctk.CTkFrame):
                 return
             
             resp = json.loads(self.cnn.ejecutar_consulta(
-                "INSERT INTO usuarios (usuario, password, rol, estado) VALUES (?, ?, ?, ?)",
+                RepoUsuarios.PG_INSERTAR,
                 (usuario, password, rol, estado)
             ))
             if resp.get("estado"):
@@ -356,13 +351,10 @@ class VistaUsuarios(ctk.CTkFrame):
                 self._limpiar_formulario()
                 self._buscar()
             else:
-                if resp.get("estado"):
-                    messagebox.showinfo("Guardado", f"Usuario '{usuario}' creado correctamente.")
-                    self._limpiar_formulario()
-                    self._buscar()
+                if resp.get("tipo") == "IntegrityError":
+                    messagebox.showerror("Duplicado", "Ya existe un usuario con ese nombre.")
                 else:
-                    # Vamos a mostrar el error real para depurar
-                    messagebox.showerror("Error real de SQL Server", resp.get("error", "Error desconocido"))
+                    messagebox.showerror("Error", resp.get("error", "No se pudo crear."))
 
     def _eliminar(self, u):
         if u["usuario"] == "admin.tesoreria":
@@ -371,7 +363,7 @@ class VistaUsuarios(ctk.CTkFrame):
         if not messagebox.askyesno("Confirmar", f"¿Eliminar al usuario '{u['usuario']}'?"):
             return
         resp = json.loads(self.cnn.ejecutar_consulta(
-            "DELETE FROM usuarios WHERE id_usuario = ?", (u["id_usuario"],)
+            RepoUsuarios.PG_ELIMINAR, (u["id_usuario"],)
         ))
         if resp.get("estado"):
             messagebox.showinfo("Eliminado", "Usuario eliminado.")

@@ -5,8 +5,8 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from componentes.tema import COLORES, FUENTES
 from componentes.tarjeta import TarjetaEstadistica
+from repositorios.repo_bienes import RepoBienes
 
-# Configurar colores de matplotlib para que coincidan con el tema
 plt.rcParams['text.color'] = COLORES["texto"]
 plt.rcParams['axes.labelcolor'] = COLORES["texto_claro"]
 plt.rcParams['xtick.color'] = COLORES["texto_claro"]
@@ -14,22 +14,21 @@ plt.rcParams['ytick.color'] = COLORES["texto_claro"]
 
 class VistaInicio(ctk.CTkFrame):
 
-    def __init__(self, master, cnn):
+    def __init__(self, master, cnn_sql): # <-- Recibe cnn_sql
         super().__init__(master, fg_color=COLORES["fondo"], corner_radius=0)
-        self.cnn = cnn
+        self.cnn = cnn_sql
         self._construir()
 
     def _construir(self):
         ctk.CTkLabel(self, text="Bienvenido(a), María López García",
                      font=FUENTES["titulo"], text_color=COLORES["texto"]).pack(
             anchor="w", padx=30, pady=(25, 0))
-        ctk.CTkLabel(self, text="Departamento de Tesorería",
+        ctk.CTkLabel(self, text="Departamento de Tesorería (Datos desde SQL Server)",
                      font=FUENTES["texto"], text_color=COLORES["texto_claro"]).pack(
             anchor="w", padx=30)
 
         stats = self._obtener_estadisticas()
 
-        # --- FILA DE TARJETAS ---
         fila_stats = ctk.CTkFrame(self, fg_color="transparent")
         fila_stats.pack(fill="x", padx=30, pady=25)
         for i in range(4):
@@ -50,11 +49,10 @@ class VistaInicio(ctk.CTkFrame):
             t = TarjetaEstadistica(fila_stats, titulo, valor, icono, color, sub, color_sub)
             t.grid(row=0, column=i, padx=8, sticky="nsew")
 
-        # --- FILA DE GRÁFICAS ---
         fila_graficas = ctk.CTkFrame(self, fg_color="transparent")
         fila_graficas.pack(fill="both", expand=True, padx=30, pady=(0, 20))
-        fila_graficas.grid_columnconfigure(0, weight=2) # Líneas es más ancha
-        fila_graficas.grid_columnconfigure(1, weight=1) # Pastel es más angosta
+        fila_graficas.grid_columnconfigure(0, weight=2)
+        fila_graficas.grid_columnconfigure(1, weight=1)
 
         self._crear_grafica_lineas(fila_graficas)
         self._crear_grafica_dona(fila_graficas)
@@ -67,20 +65,14 @@ class VistaInicio(ctk.CTkFrame):
         ctk.CTkLabel(marco, text="Bienes adquiridos por mes", font=FUENTES["subtitulo"],
                      text_color=COLORES["texto"]).pack(anchor="w", padx=20, pady=(15, 0))
 
-        # Obtener datos reales de la BD
-        sql = """
-            SELECT TO_CHAR(fecha_adquisicion, 'YYYY-MM') AS mes, COUNT(*) AS total
-            FROM bienes
-            GROUP BY TO_CHAR(fecha_adquisicion, 'YYYY-MM')
-            ORDER BY mes
-        """
+        # Usa la consulta de SQL Server
+        sql = RepoBienes.SQL_GRAFICA_MES
         resp = json.loads(self.cnn.ejecutar_consulta(sql))
         datos = resp.get("registros", [])
         
         meses = [d["mes"] for d in datos]
         totales = [d["total"] for d in datos]
 
-        # Si no hay datos, poner algo de relleno para que no se vea vacía
         if not meses:
             meses = ["2024-01", "2024-02"]
             totales = [0, 0]
@@ -108,7 +100,7 @@ class VistaInicio(ctk.CTkFrame):
         ctk.CTkLabel(marco, text="Distribución por estado", font=FUENTES["subtitulo"],
                      text_color=COLORES["texto"]).pack(anchor="w", padx=20, pady=(15, 0))
 
-        sql = "SELECT estado, COUNT(*) AS total FROM bienes GROUP BY estado"
+        sql = RepoBienes.SQL_GRAFICA_ESTADO
         resp = json.loads(self.cnn.ejecutar_consulta(sql))
         datos = resp.get("registros", [])
 
@@ -137,14 +129,7 @@ class VistaInicio(ctk.CTkFrame):
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
 
     def _obtener_estadisticas(self):
-        sql = """
-            SELECT
-                COUNT(*) AS total,
-                COUNT(*) FILTER (WHERE estado = 'Activo') AS activos,
-                COUNT(*) FILTER (WHERE estado = 'Inactivo') AS mantenimiento,
-                COUNT(*) FILTER (WHERE estado = 'Baja') AS bajas
-            FROM bienes
-        """
+        sql = RepoBienes.SQL_STATS
         resp = json.loads(self.cnn.ejecutar_consulta(sql))
         if not resp.get("estado") or not resp["registros"]:
             return {"total": 0, "activos": 0, "mantenimiento": 0, "bajas": 0,
@@ -153,11 +138,11 @@ class VistaInicio(ctk.CTkFrame):
         total = r["total"] or 1
         return {
             "total": r["total"],
-            "activos": r["activos"],
-            "mantenimiento": r["mantenimiento"],
-            "bajas": r["bajas"],
+            "activos": r["activos"] or 0,
+            "mantenimiento": r["mantenimiento"] or 0,
+            "bajas": r["bajas"] or 0,
             "nuevos": 0,
-            "porc_activos": round(100 * r["activos"] / total, 1),
-            "porc_mant": round(100 * r["mantenimiento"] / total, 1),
-            "porc_bajas": round(100 * r["bajas"] / total, 1),
+            "porc_activos": round(100 * (r["activos"] or 0) / total, 1),
+            "porc_mant": round(100 * (r["mantenimiento"] or 0) / total, 1),
+            "porc_bajas": round(100 * (r["bajas"] or 0) / total, 1),
         }
